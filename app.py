@@ -10,12 +10,15 @@ from PIL import Image
 from keras import layers, models
 from keras.models import load_model
 from keras.utils import register_keras_serializable
-from keras.applications.resnet50 import ResNet50, preprocess_input
+from model.model_utils import predict_emotion
+
+# backend availabily checker 
+USE_BACKEND = os.getenv("USE_BACKEND", "false").lower() == "true"
 
 st.set_page_config(page_title="EmoDec", layout="wide")
 st.markdown("""
     <style>
-    /* Inverse le flux vidéo en direct ET l'image capturée */
+    /* disable mirror effect */
     div[data-testid="stCameraInput"] video, 
     div[data-testid="stCameraInput"] img {
         transform: scaleX(-1);
@@ -176,76 +179,95 @@ def load_face_cascade():
     return face_cascade
 
 
-def detect_and_crop_face_from_array(image_array, face_cascade, target_size=(224, 224)):
-    img_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+# backend availability ----
 
-    faces = face_cascade.detectMultiScale(
-        gray,
-        scaleFactor=1.1,
-        minNeighbors=4
+# Check if MinIO and Postgres are available
+@st.cache_resource(ttl=3600)
+def is_backend_available():
+    backend_available = False
+    try:
+        # MinIO
+        from storage.storage_utils import client
+        client.list_buckets()
+
+        # Postgres
+        import psycopg2
+        from db.db_utils import get_connection
+        conn = get_connection()
+        conn.close()
+
+        backend_available = True
+    except Exception:
+        backend_available = False
+
+    return backend_available
+
+
+USE_BACKEND = is_backend_available()
+
+if USE_BACKEND:
+    from storage.storage_utils import upload_image, get_image_url
+    from db.db_utils import save_prediction
+    
+
+def safe_upload_image(pil_image):
+    if not USE_BACKEND or pil_image is None:
+        return None
+    try:
+        return upload_image(pil_image)
+    except Exception as e:
+        print("MinIO upload error:", e)
+        return None
+
+
+def render_feedback(predicted_label, confidence, cropped_face_rgb):
+    st.subheader("Feedback")
+
+    feedback = st.radio(
+        "Is this prediction correct?",
+        ["Yes ✅", "No ❌"],
+        key="feedback_choice"
     )
 
-    if len(faces) > 0:
-        faces = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)
-        x, y, w, h = faces[0]
-        face_bgr = img_bgr[y:y+h, x:x+w]
-        face_found = True
-    else:
-        face_bgr = img_bgr
-        face_found = False
+    correct_label = predicted_label
 
-    face_bgr = cv2.resize(face_bgr, target_size)
-    face_rgb = cv2.cvtColor(face_bgr, cv2.COLOR_BGR2RGB)
+    if feedback == "No ❌":
+        correct_label = st.selectbox(
+            "What emotion were you expressing?",
+            list(int_to_label.values()),
+            key="correct_label"
+        )
 
-    return face_rgb.astype(np.float32), face_found
+    if st.button("Submit Feedback"):
+        image_url = safe_upload_image(Image.fromarray(cropped_face_rgb))
 
+        save_prediction(
+            image_url=image_url,
+            predicted=predicted_label,
+            correct=correct_label,
+            confidence=confidence
+        )
 
-def prepare_image_for_model(image_array, face_cascade):
-    cropped_face_rgb, face_found = detect_and_crop_face_from_array(
-        image_array=image_array,
-        face_cascade=face_cascade,
-        target_size=IMG_SIZE,
-    )
+        st.success("Feedback saved to database 🚀")
 
-    model_input = preprocess_input(cropped_face_rgb.copy())
-    model_input = np.expand_dims(model_input, axis=0)
-
-    return model_input, cropped_face_rgb.astype(np.uint8), face_found
-
-
-def predict_emotion(model, image_array, face_cascade):
-    model_input, cropped_face_rgb, face_found = prepare_image_for_model(
-        image_array=image_array,
-        face_cascade=face_cascade,
-    )
-
-    preds = model.predict(model_input, verbose=0)[0]
-    predicted_index = int(np.argmax(preds))
-    confidence = float(np.max(preds))
-    predicted_label = int_to_label[predicted_index]
-
-    return predicted_label, confidence, preds, cropped_face_rgb, face_found
-
-
-
+# -----------------------
 model = load_emotion_model()
 face_cascade = load_face_cascade()
 
 # ---------------- LEFT SIDE ----------------
 with col1:
-    st.write("Upload a face image or take a picture to predict emotion.")
+    st.write("Upload a face image or take a picture to predict an emotion.")
 
     option = st.radio("Choose input method:", ["Upload Image", "Use Camera"])
 
-    image_array = None  # important
-    uploaded_file = None
-    camera_image = None
+    # variables initialized
+    image_array = None
+    pil_image = None
 
     if option == "Upload Image":
         uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
 
-        if uploaded_file is not None:
+        if uploaded_file:
             pil_image = Image.open(uploaded_file).convert("RGB")
             image_array = np.array(pil_image)
 
@@ -285,6 +307,12 @@ with col2:
                 st.image(cropped_face_rgb, width=200)
 
             st.success("Face detected successfully ✅")
+            
+            # image saved in minio
+            image_filename = safe_upload_image(image_array)
+            if image_filename:
+                image_url = get_image_url(image_filename)
+                st.write("Stored original image URL:", image_url)
 
             st.write(f"Predicted emotion: **{predicted_label}**")
             st.write(f"Confidence: **{confidence:.2%}**")
@@ -302,24 +330,5 @@ with col2:
                 with col_bar:
                     st.progress(float(prob))
             
-            _ = """
-            feedback = st.radio(
-                "Is this prediction correct?",
-                ["Yes ✅", "No ❌"],
-                key="feedback_choice"
-            )
-
-            correct_label = None
-
-            if feedback == "No ❌":
-                correct_label = st.selectbox(
-                    "What emotion were you expressing?",
-                    list(int_to_label.values()),
-                    key="correct_label"
-                )
-
-            if st.button("Submit Feedback"):
-                if feedback == "Yes ✅":
-                    st.success("Thanks for confirming! 🙌")
-                else:
-                    st.success("Thanks! This helps improve the model 🚀") """
+            if USE_BACKEND:
+                render_feedback(predicted_label, confidence, cropped_face_rgb)
