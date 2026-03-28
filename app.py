@@ -15,8 +15,9 @@ from keras.applications.resnet50 import ResNet50, preprocess_input
 st.set_page_config(page_title="EmoDec", layout="wide")
 st.markdown("""
     <style>
-    /* Inverse horizontalement le flux de la caméra */
-    div[data-testid="stCameraInput"] video {
+    /* Inverse le flux vidéo en direct ET l'image capturée */
+    div[data-testid="stCameraInput"] video, 
+    div[data-testid="stCameraInput"] img {
         transform: scaleX(-1);
     }
     </style>
