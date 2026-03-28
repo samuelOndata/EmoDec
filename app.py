@@ -263,7 +263,7 @@ with col1:
     # variables initialized
     image_array = None
     pil_image = None
-    upload_image = None
+    uploaded_file = None
     camera_image = None
 
     if option == "Upload Image":
