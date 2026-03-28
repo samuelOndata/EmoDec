@@ -13,6 +13,14 @@ from keras.utils import register_keras_serializable
 from keras.applications.resnet50 import ResNet50, preprocess_input
 
 st.set_page_config(page_title="EmoDec", layout="wide")
+st.markdown("""
+    <style>
+    /* Inverse horizontalement le flux de la caméra */
+    div[data-testid="stCameraInput"] video {
+        transform: scaleX(-1);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 st.title("EmoDec - Facial Expression Recognition Model 😀 😞 😡 🫣")
 
