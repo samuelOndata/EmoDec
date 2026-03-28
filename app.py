@@ -4,6 +4,7 @@ import cv2
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
+from huggingface_hub import hf_hub_download
 from tensorflow.keras import layers
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import register_keras_serializable
@@ -18,8 +19,8 @@ st.title("EmoDec - Facial Expression Recognition Model 😀 😞 😡 🫣")
 # Create 2 columns
 col1, col2 = st.columns(2)
 
-MODEL_PATH = "best_model_20260327-122803.keras"
-CASCADE_PATH = "haarcascade_frontalface_default.xml"
+MODEL_PATH = "model/best_model_20260327-122803.keras"
+CASCADE_PATH = "model/haarcascade_frontalface_default.xml"
 IMG_SIZE = (224, 224)
 
 label_to_int = {
@@ -31,11 +32,6 @@ label_to_int = {
     "Neutral": 5,
     "Sad": 6,
     "Suprise": 7
-}
-
-class_names = {
-    0: 'Anger', 1: 'Contempt', 2: 'Disgust', 3: 'Fear',
-    4: 'Happy', 5: 'Neutral', 6: 'Sad', 7: 'Surprise'
 }
 
 int_to_label = {v: k for k, v in label_to_int.items()}
@@ -149,27 +145,6 @@ class CBAMBlock(layers.Layer):
         })
         return config
 
-
-@st.cache_resource
-def build_emotion_model(num_classes=8, input_shape=(224, 224, 3)):
-
-    base_model = ResNet50(
-        weights="imagenet",
-        include_top=False,
-        input_shape=input_shape
-    )
-
-    inputs = layers.Input(shape=input_shape, name="input_image")
-    x = base_model(inputs, training=False)
-    x = CBAMBlock(name="cbam_block")(x)
-    x = layers.GlobalAveragePooling2D(name="global_avg_pool")(x)
-    x = layers.Dropout(0.3, name="dropout_1")(x)
-    x = layers.Dense(128, activation="relu", name="dense_128")(x)
-    x = layers.BatchNormalization(name="batch_norm")(x)
-    x = layers.Dropout(0.3, name="dropout_2")(x)
-    outputs = layers.Dense(num_classes, activation="softmax", name="output_layer")(x)
-
-    return models.Model(inputs=inputs, outputs=outputs, name="ResNet50_CBAM")
 
 @st.cache_resource
 def load_emotion_model():
@@ -316,3 +291,24 @@ with col2:
 
                 with col_bar:
                     st.progress(float(prob))
+            
+            feedback = st.radio(
+                "Is this prediction correct?",
+                ["Yes ✅", "No ❌"],
+                key="feedback_choice"
+            )
+
+            correct_label = None
+
+            if feedback == "No ❌":
+                correct_label = st.selectbox(
+                    "What emotion were you expressing?",
+                    list(int_to_label.values()),
+                    key="correct_label"
+                )
+
+            if st.button("Submit Feedback"):
+                if feedback == "Yes ✅":
+                    st.success("Thanks for confirming! 🙌")
+                else:
+                    st.success("Thanks! This helps improve the model 🚀")
