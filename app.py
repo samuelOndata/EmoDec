@@ -3,14 +3,14 @@ import numpy as np
 import cv2
 import streamlit as st
 import tensorflow as tf
+import keras
 from PIL import Image
-from huggingface_hub import hf_hub_download
-from tensorflow.keras import layers
-from tensorflow.keras.models import load_model
-from tensorflow.keras.utils import register_keras_serializable
-from tensorflow.keras.applications import ResNet50
-from tensorflow.keras import layers, models
-from tensorflow.keras.applications.resnet50 import preprocess_input
+
+# Imports specific for Keras 3
+from keras import layers, models
+from keras.models import load_model
+from keras.utils import register_keras_serializable
+from keras.applications.resnet50 import ResNet50, preprocess_input
 
 st.set_page_config(page_title="EmoDec", layout="wide")
 
@@ -292,6 +292,7 @@ with col2:
                 with col_bar:
                     st.progress(float(prob))
             
+            _ = """
             feedback = st.radio(
                 "Is this prediction correct?",
                 ["Yes ✅", "No ❌"],
@@ -311,4 +312,4 @@ with col2:
                 if feedback == "Yes ✅":
                     st.success("Thanks for confirming! 🙌")
                 else:
-                    st.success("Thanks! This helps improve the model 🚀")
+                    st.success("Thanks! This helps improve the model 🚀") """
