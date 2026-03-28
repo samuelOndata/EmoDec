@@ -263,6 +263,8 @@ with col1:
     # variables initialized
     image_array = None
     pil_image = None
+    upload_image = None
+    camera_image = None
 
     if option == "Upload Image":
         uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
