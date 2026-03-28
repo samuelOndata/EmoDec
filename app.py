@@ -257,7 +257,8 @@ with col1:
 
         if camera_image is not None:
             pil_image = Image.open(camera_image).convert("RGB")
-            image_array = np.array(pil_image)
+            raw_array = np.array(pil_image)
+            image_array = np.fliplr(raw_array)
 
             st.subheader("Captured Image")
             st.image(image_array, use_container_width=True)
