@@ -203,6 +203,7 @@ def is_backend_available():
 USE_BACKEND = is_backend_available()
 
 if USE_BACKEND:
+    st.write("database state seen")
     from storage.storage_utils import upload_image, get_image_url
     from db.db_utils import save_prediction
     
