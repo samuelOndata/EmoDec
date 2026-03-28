@@ -1,0 +1,6 @@
+streamlit
+keras>=3.13.2
+tensorflow>=2.19.0
+numpy
+opencv-python-headless
+Pillow 
