@@ -12,9 +12,6 @@ from keras.models import load_model
 from keras.utils import register_keras_serializable
 from model.model_utils import predict_emotion
 
-# backend availabily checker 
-USE_BACKEND = os.getenv("USE_BACKEND", "false").lower() == "true"
-
 st.set_page_config(page_title="EmoDec", layout="wide")
 st.markdown("""
     <style>
