@@ -1,10 +1,40 @@
-
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from db.db_utils import get_all_predictions
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# --- ACCESS CONTROL ---
+ACCESS_CODE = os.getenv("DASHBOARD_ACCESS_CODE", "admin123") # Fallback to admin123
+
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.title("🔐 Admin Access Required")
+    
+    # Use type="password" to hide the characters as they are typed
+    user_input = st.text_input("Enter Access Code:", type="password")
+    
+    if st.button("Login"):
+        if user_input == ACCESS_CODE:
+            st.session_state.authenticated = True
+            st.rerun() # Refresh to show the dashboard
+        else:
+            st.error("Invalid code. Access denied.")
+    st.stop() # Stops execution here so the rest of the code doesn't run
+
+# --- EVERYTHING BELOW RUNS ONLY IF AUTHENTICATED IS TRUE ---
 
 st.title("📊 Model Analytics Dashboard")
+
+# Add a logout button in the sidebar
+if st.sidebar.button("Log Out"):
+    st.session_state.authenticated = False
+    st.rerun()
 
 # 1. Fetch data from your SQL table
 data = get_all_predictions()
