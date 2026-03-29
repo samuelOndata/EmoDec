@@ -337,8 +337,8 @@ with col2:
             # Retrieve the URL from session state for the rest of the logic
             image_url = st.session_state.get("current_image_url")
 
-            if image_url:
-                st.write(f"Stored original image URL: {image_url}")
+            #if image_url:
+             #   st.write(f"Stored original image URL: {image_url}")
 
             st.write(f"Predicted emotion: **{predicted_label}**")
             st.write(f"Confidence: **{confidence:.2%}**")
