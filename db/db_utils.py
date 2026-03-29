@@ -7,8 +7,6 @@ load_dotenv()
 
 def get_connection():
     try:
-        st.write(f"Hôte détecté : '{os.getenv('DB_HOST')}'")
-
         return psycopg2.connect(
             host=os.getenv("DB_HOST"),
             port=os.getenv("DB_PORT", "6543"),
