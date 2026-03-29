@@ -1,6 +1,13 @@
-from minio import Minio
 import os
+import io
 import uuid
+import tempfile
+import numpy as np
+from PIL import Image
+from minio import Minio
+
+from dotenv import load_dotenv
+load_dotenv()
 
 # Create client ONCE
 client = Minio(
@@ -22,22 +29,33 @@ def ensure_bucket():
         print("Bucket error:", e)
 
 
-def upload_image(pil_image):
-    """Upload image to MinIO and return filename"""
+def upload_image(image_input):
     ensure_bucket()
+    
+    # Conversion en objet PIL si nécessaire
+    if isinstance(image_input, np.ndarray):
+        pil_image = Image.fromarray(image_input)
+    else:
+        pil_image = image_input
+
+    # Création d'un buffer en mémoire (pas de fichier sur le disque)
+    img_byte_arr = io.BytesIO()
+    pil_image.save(img_byte_arr, format='JPEG')
+    img_byte_arr.seek(0) # Revenir au début du flux
 
     filename = f"{uuid.uuid4()}.jpg"
-    temp_path = f"/tmp/{filename}"
 
-    pil_image.save(temp_path)
-
-    client.fput_object(
+    # Utilisation de put_object (pour les flux de données) au lieu de fput_object
+    client.put_object(
         BUCKET_NAME,
         filename,
-        temp_path
+        img_byte_arr,
+        length=img_byte_arr.getbuffer().nbytes,
+        content_type='image/jpeg'
     )
 
     return filename
+
 
 
 def get_image_url(filename):

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import cv2
+import hashlib
 import streamlit as st
 import tensorflow as tf
 import keras
@@ -11,6 +12,10 @@ from keras import layers, models
 from keras.models import load_model
 from keras.utils import register_keras_serializable
 from model.model_utils import predict_emotion
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 st.set_page_config(page_title="EmoDec", layout="wide")
 st.markdown("""
@@ -179,7 +184,7 @@ def load_face_cascade():
 # backend availability ----
 
 # Check if MinIO and Postgres are available
-@st.cache_resource(ttl=3600)
+@st.cache_resource()
 def is_backend_available():
     backend_available = False
     try:
@@ -194,7 +199,7 @@ def is_backend_available():
         conn.close()
 
         backend_available = True
-    except Exception:
+    except Exception as e:
         backend_available = False
 
     return backend_available
@@ -203,9 +208,11 @@ def is_backend_available():
 USE_BACKEND = is_backend_available()
 
 if USE_BACKEND:
-    st.write("database state seen")
     from storage.storage_utils import upload_image, get_image_url
     from db.db_utils import save_prediction
+else:
+    st.write("database state NOT seen")
+    
     
 
 def safe_upload_image(pil_image):
@@ -218,7 +225,7 @@ def safe_upload_image(pil_image):
         return None
 
 
-def render_feedback(predicted_label, confidence, cropped_face_rgb):
+def render_feedback(image_url, predicted_label, confidence):
     st.subheader("Feedback")
 
     feedback = st.radio(
@@ -237,7 +244,6 @@ def render_feedback(predicted_label, confidence, cropped_face_rgb):
         )
 
     if st.button("Submit Feedback"):
-        image_url = safe_upload_image(Image.fromarray(cropped_face_rgb))
 
         save_prediction(
             image_url=image_url,
@@ -272,7 +278,7 @@ with col1:
             image_array = np.array(pil_image)
 
             st.subheader("Uploaded Image")
-            st.image(image_array, use_container_width=True)
+            st.image(image_array, width='stretch')
 
     elif option == "Use Camera":
         camera_image = st.camera_input("Take a picture")
@@ -283,7 +289,7 @@ with col1:
             image_array = np.fliplr(raw_array)
 
             st.subheader("Captured Image")
-            st.image(image_array, use_container_width=True)
+            st.image(image_array, width='stretch')
 
 
 # ---------------- RIGHT SIDE ----------------
@@ -291,6 +297,14 @@ with col2:
     st.header("Results")
 
     if uploaded_file is not None or camera_image is not None:
+        if uploaded_file:
+            current_file_id = uploaded_file.name
+        else:
+            # Create a unique ID based on the pixel data of the camera shot
+            # This ensures that even if it's the "camera", a new face = a new ID
+            img_hash = hashlib.md5(image_array.tobytes()).hexdigest()
+            current_file_id = f"camera_{img_hash}"
+        
         predicted_label, confidence, preds, cropped_face_rgb, face_found = predict_emotion(
             model=model,
             image_array=image_array,
@@ -299,6 +313,10 @@ with col2:
 
         if not face_found:
             st.warning("No face detected. Please upload an image with a human face.")
+            # Clear previous session data if no face is found
+            st.session_state.current_image_url = None
+            st.session_state.last_uploaded_file = None
+
         else:
             st.subheader("Processed Face")
             col_left, col_center, col_right = st.columns([1,2,1])
@@ -308,11 +326,19 @@ with col2:
 
             st.success("Face detected successfully ✅")
             
-            # image saved in minio
-            image_filename = safe_upload_image(image_array)
-            if image_filename:
-                image_url = get_image_url(image_filename)
-                st.write("Stored original image URL:", image_url)
+            # --- SINGLE UPLOAD LOGIC ---
+            # Only upload if the file ID has changed or if we don't have a URL yet
+            if ("last_uploaded_file" not in st.session_state or st.session_state.last_uploaded_file != current_file_id):
+                image_filename = safe_upload_image(image_array)
+                if image_filename:
+                    st.session_state.current_image_url = get_image_url(image_filename)
+                    st.session_state.last_uploaded_file = current_file_id
+            
+            # Retrieve the URL from session state for the rest of the logic
+            image_url = st.session_state.get("current_image_url")
+
+            if image_url:
+                st.write(f"Stored original image URL: {image_url}")
 
             st.write(f"Predicted emotion: **{predicted_label}**")
             st.write(f"Confidence: **{confidence:.2%}**")
@@ -331,4 +357,4 @@ with col2:
                     st.progress(float(prob))
             
             if USE_BACKEND:
-                render_feedback(predicted_label, confidence, cropped_face_rgb)
+                render_feedback(image_url, predicted_label, confidence)

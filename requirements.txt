@@ -6,3 +6,5 @@ opencv-python-headless
 Pillow
 minio
 psycopg2-binary
+python-dotenv
+plotly

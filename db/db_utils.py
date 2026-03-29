@@ -1,13 +1,20 @@
 import psycopg2
 import os
+import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_connection():
-    return psycopg2.connect(
-        host="localhost",
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD")
-    )
+    try:
+        return psycopg2.connect(
+            host="localhost",
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD")
+        )
+    except Exception as e:
+        st.error(f"Erreur de connexion postgres : {e}")
 
 
 def save_prediction(image_url, predicted, correct, confidence):
@@ -26,6 +33,7 @@ def save_prediction(image_url, predicted, correct, confidence):
     conn.close()
 
 
+# @st.cache_data(ttl=600)
 def get_all_predictions():
     conn = get_connection()
     cur = conn.cursor()

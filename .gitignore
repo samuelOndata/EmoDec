@@ -1,1 +1,16 @@
-*.env
+# Secrets and environment variables
+.env
+
+# Virtual environment folder
+emovenv/
+venv/
+env/
+
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS-specific files
+.DS_Store
+Thumbs.db
