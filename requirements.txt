@@ -1,6 +1,6 @@
 streamlit
 keras==3.13.2
-tensorflow-cpu==2.19.0
+tensorflow-cpu==2.16.1
 numpy<2.0.0
 opencv-python-headless
 Pillow
