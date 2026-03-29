@@ -7,12 +7,16 @@ load_dotenv()
 
 def get_connection():
     try:
+        st.write(f"Hôte détecté : '{os.getenv('DB_HOST')}'")
+
         return psycopg2.connect(
-            host="localhost",
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT", "6543"),
             dbname=os.getenv("DB_NAME"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD")
         )
+        
     except Exception as e:
         st.error(f"Erreur de connexion postgres : {e}")
 

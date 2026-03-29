@@ -184,7 +184,7 @@ def load_face_cascade():
 # backend availability ----
 
 # Check if MinIO and Postgres are available
-@st.cache_resource()
+_ = """ st.cache_resource()
 def is_backend_available():
     backend_available = False
     try:
@@ -202,8 +202,29 @@ def is_backend_available():
     except Exception as e:
         backend_available = False
 
-    return backend_available
+    return backend_available """
 
+@st.cache_resource()
+def is_backend_available():
+    backend_available = False
+    try:
+        # 1. Test Supabase Storage (Remplace MinIO)
+        from storage.storage_utils import supabase, BUCKET_NAME
+        # On vérifie juste si on peut accéder au bucket
+        supabase.storage.get_bucket(BUCKET_NAME)
+
+        # 2. Test Postgres (Supabase DB)
+        from db.db_utils import get_connection
+        conn = get_connection()
+        conn.close()
+
+        backend_available = True
+    except Exception as e:
+        # Optionnel : décommenter pour voir l'erreur exacte dans la console
+        # st.error(f"Détail erreur backend: {e}") 
+        backend_available = False
+
+    return backend_available
 
 USE_BACKEND = is_backend_available()
 
